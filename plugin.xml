@@ -27,11 +27,11 @@
         </config-file>
 
 		<config-file target="app/src/main/res/values/strings.xml" parent="/*">
-            <string name="app_id">537142217701</string>
+            <string name="gp_app_id">537142217701</string>
         </config-file>
             
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
-            <meta-data android:name="com.google.android.gms.games.APP_ID" android:value="@string/app_id" />
+            <meta-data android:name="com.google.android.gms.games.APP_ID" android:value="@string/gp_app_id" />
         </config-file>
 
         <config-file target="AndroidManifest.xml" parent="/manifest">
