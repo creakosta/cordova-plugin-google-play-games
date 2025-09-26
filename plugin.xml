@@ -26,7 +26,8 @@
             </feature>
         </config-file>
 
-		<config-file target="app/src/main/res/values/strings.xml" parent="/*">
+		<source-file src="src/android/strings.xml" target-dir="app/src/main/res/xml/strings.xml" />
+		<config-file target="app/src/main/res/xml/strings.xml" parent="/*">
             <string name="app_id">$APP_ID</string>
         </config-file>
             
