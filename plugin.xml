@@ -26,9 +26,8 @@
             </feature>
         </config-file>
 
-		<source-file src="src/android/pgid.xml" target-dir="app/src/main/res/values/pgid.xml" />
-		<config-file target="app/src/main/res/values/pgid.xml" parent="/*">
-            <string name="app_id">$APP_ID</string>
+		<config-file target="app/src/main/res/values/strings.xml" parent="/*">
+            <string name="app_id">537142217701</string>
         </config-file>
             
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
