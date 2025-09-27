@@ -25,10 +25,6 @@
                 <param name="android-package" value="io.luzh.cordova.plugin.GooglePlayGamesPlugin" />
             </feature>
         </config-file>
-
-		<config-file target="res/values/strings.xml" parent="/resources">
-			<string translatable="false"  name="game_services_project_id"> 537142217701 </string>
-        </config-file>
             
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
             <meta-data android:name="com.google.android.gms.games.APP_ID" android:value="@string/game_services_project_id" />
