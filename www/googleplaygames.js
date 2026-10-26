@@ -6,12 +6,15 @@ exports.errorCodes = {
 };
 
 /**
- * Login
+ * Login. Checks automatic sign-in first; if the player is not signed in,
+ * shows the manual Play Games sign-in dialog (call it from a user action, e.g. a button).
+ * @param {Boolean} [params.silent=false] - only check automatic sign-in, never show the dialog
  */
-exports.login = function login()
+exports.login = function login(params)
 {
+    params = defaults(params, { silent: false });
     return new Promise((resolve, reject) => {
-        callPlugin('login', [], resolve, reject);
+        callPlugin('login', [!!params.silent], resolve, reject);
     });
 };
 
