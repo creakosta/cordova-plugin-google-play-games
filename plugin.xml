@@ -26,8 +26,9 @@
             </feature>
         </config-file>
 
-		<config-file parent="/resources" target="res/values/strings.xml">
-            <string translatable="false"  name="game_services_project_id"> $APP_ID </string>
+		<resource-file src="src/android/pgid.xml" target="res/values/pgid.xml" />
+        <config-file parent="/resources" target="res/values/pgid.xml">
+            <string translatable="false" name="game_services_project_id">$APP_ID</string>
         </config-file>
             
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
