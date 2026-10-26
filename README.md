@@ -82,6 +82,10 @@ This library is Promise style, you can use .then or await to fetch results
 
 ```javascript
 import * as GooglePlayGames from 'cordova-plugin-google-play-games';
+// On app start: only check automatic sign-in, no dialog
+try { let { id } = await GooglePlayGames.login({ silent: true }); } catch (e) { /* show "Sign in" button */ }
+
+// From a "Sign in" button: shows the Play Games sign-in dialog if needed
 let { id } = await GooglePlayGames.login(); // userId returned
 ```
 ***

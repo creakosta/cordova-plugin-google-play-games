@@ -48,8 +48,5 @@
 		
         <framework src="src/android/googleplaygames.gradle" custom="true" type="gradleReference" />
 
-        <framework src="com.android.support:support-v4:+" />
-        <framework src="com.android.support:recyclerview-v7:27.1.1" />
-
     </platform>
 </plugin>
