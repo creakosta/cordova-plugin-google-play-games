@@ -26,7 +26,7 @@
             </feature>
         </config-file>
 
-		<config-file parent="/resources" target="./res/values/strings.xml">
+		<config-file parent="/resources" target="res/values/strings.xml">
             <string translatable="false"  name="game_services_project_id"> $APP_ID </string>
         </config-file>
             
