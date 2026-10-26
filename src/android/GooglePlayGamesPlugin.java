@@ -273,9 +273,12 @@ public class GooglePlayGamesPlugin extends CordovaPlugin {
     }
 
     /**
-     * Login
+     * Login.
+     * args[0] (optional, boolean) - silent: only check automatic sign-in,
+     * do not show the manual Play Games sign-in dialog.
      */
     private void loginAction(JSONArray args, final CallbackContext callbackContext) {
+        final boolean silent = args.optBoolean(0, false);
         cordova.getActivity().runOnUiThread(new Runnable() {
             public void run() {
                 GamesSignInClient gamesSignInClient = PlayGames.getGamesSignInClient(cordova.getActivity());
@@ -286,47 +289,85 @@ public class GooglePlayGamesPlugin extends CordovaPlugin {
                                     isAuthenticatedTask.getResult().isAuthenticated());
 
                     if (isAuthenticated) {
-                        PlayGames.getPlayersClient(cordova.getActivity()).getCurrentPlayer().addOnCompleteListener(mTask -> {
-                                try {
-                                    JSONObject result = new JSONObject();
-                                    result.put("id", mTask.getResult().getPlayerId());
-                                    result.put("name", mTask.getResult().getDisplayName());
-                                    result.put("title", mTask.getResult().getTitle());
-                                    result.put("avatar", mTask.getResult().getHiResImageUri());
-                                    result.put("icon", mTask.getResult().getIconImageUri());
-
-                                    if (mTask.getResult().hasIconImage()) {
-                                        ImageManager mgr = ImageManager.create(cordova.getContext());
-                                        mgr.loadImage((uri, drawable, isRequestedDrawable) -> {
-                                            if (isRequestedDrawable) {
-                                                Bitmap bitmap = ((BitmapDrawable) drawable).getBitmap();
-                                                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                                                bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream);
-                                                byte[] byteArray = byteArrayOutputStream.toByteArray();
-                                                String encoded = Base64.encodeToString(byteArray, Base64.DEFAULT);
-                                                try {
-                                                    result.put("iconImageBase64", "data:image/png;base64, " + encoded);
-                                                } catch (Exception e) {
-                                                    Log.e(TAG, "Error while getting base64 for user");
-                                                } finally {
-                                                    callbackContext.success(result);
-                                                }
-                                            }
-                                        }, Objects.requireNonNull(mTask.getResult().getIconImageUri()));
-                                    } else {
-                                        callbackContext.success(result);
-                                    }
-                                } catch (JSONException err) {
-                                    callbackContext.error(err.getMessage());
-                                }
-                            }
-                        );
-                    } else {
+                        sendCurrentPlayer(callbackContext);
+                    } else if (silent) {
                         callbackContext.error("Login failed");
+                    } else {
+                        // Automatic sign-in failed: show the manual sign-in flow (PGS v2)
+                        gamesSignInClient.signIn().addOnCompleteListener(signInTask -> {
+                            boolean signedIn =
+                                    (signInTask.isSuccessful() &&
+                                            signInTask.getResult().isAuthenticated());
+                            if (signedIn) {
+                                sendCurrentPlayer(callbackContext);
+                            } else {
+                                callbackContext.error("Login failed");
+                            }
+                        });
                     }
                 });
             }
         });
+    }
+
+    /**
+     * Returns the current player's data to JS
+     */
+    private void sendCurrentPlayer(final CallbackContext callbackContext) {
+        PlayGames.getPlayersClient(cordova.getActivity()).getCurrentPlayer().addOnCompleteListener(mTask -> {
+                // getResult() throws RuntimeExecutionException if the task failed,
+                // so check the task status first and report the error to JS instead.
+                if (!mTask.isSuccessful()) {
+                    Exception e = mTask.getException();
+                    Log.e(TAG, "Error while getting current player", e);
+                    callbackContext.error(e != null && e.getMessage() != null
+                            ? e.getMessage() : "Failed to get current player");
+                    return;
+                }
+                final Player player = mTask.getResult();
+                if (player == null) {
+                    callbackContext.error("Failed to get current player");
+                    return;
+                }
+                try {
+                    JSONObject result = new JSONObject();
+                    result.put("id", player.getPlayerId());
+                    result.put("name", player.getDisplayName());
+                    result.put("title", player.getTitle());
+                    result.put("avatar", player.getHiResImageUri());
+                    result.put("icon", player.getIconImageUri());
+
+                    if (player.hasIconImage() && player.getIconImageUri() != null) {
+                        ImageManager mgr = ImageManager.create(cordova.getContext());
+                        mgr.loadImage((uri, drawable, isRequestedDrawable) -> {
+                            if (!(drawable instanceof BitmapDrawable)) {
+                                // Icon could not be loaded: return the player without the base64 icon
+                                callbackContext.success(result);
+                                return;
+                            }
+                            {
+                                Bitmap bitmap = ((BitmapDrawable) drawable).getBitmap();
+                                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                                bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream);
+                                byte[] byteArray = byteArrayOutputStream.toByteArray();
+                                String encoded = Base64.encodeToString(byteArray, Base64.DEFAULT);
+                                try {
+                                    result.put("iconImageBase64", "data:image/png;base64, " + encoded);
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Error while getting base64 for user");
+                                } finally {
+                                    callbackContext.success(result);
+                                }
+                            }
+                        }, player.getIconImageUri());
+                    } else {
+                        callbackContext.success(result);
+                    }
+                } catch (JSONException err) {
+                    callbackContext.error(err.getMessage());
+                }
+            }
+        );
     }
 
     /**
@@ -589,8 +630,16 @@ public class GooglePlayGamesPlugin extends CordovaPlugin {
                     .continueWith(new Continuation<SnapshotsClient.DataOrConflict<Snapshot>, byte[]>() {
                         @Override
                         public byte[] then(@NonNull Task<SnapshotsClient.DataOrConflict<Snapshot>> task) throws Exception {
-                            Snapshot snapshot = task.getResult().getData();
-                            // Opening the snapshot was a success and any conflicts have been resolved.
+                            // The failure was already reported by the OnFailureListener above.
+                            if (!task.isSuccessful()) {
+                                return null;
+                            }
+                            SnapshotsClient.DataOrConflict<Snapshot> dataOrConflict = task.getResult();
+                            Snapshot snapshot = dataOrConflict != null ? dataOrConflict.getData() : null;
+                            if (snapshot == null) {
+                                callbackContext.error("Snapshot is not available (unresolved conflict)");
+                                return null;
+                            }
                             try {
                                 // Extract the raw data from the snapshot.
                                 return snapshot.getSnapshotContents().readFully();
@@ -604,17 +653,23 @@ public class GooglePlayGamesPlugin extends CordovaPlugin {
                     .addOnCompleteListener(new OnCompleteListener<byte[]>() {
                         @Override
                         public void onComplete(@NonNull Task<byte[]> task) {
-                            task.addOnSuccessListener(new OnSuccessListener<byte[]>() {
-                                @Override
-                                public void onSuccess(byte[] bytes) {
-                                    try {
-                                        Log.e(TAG, "READ SUCCESS");
-                                        callbackContext.success(new JSONObject(new String(bytes, StandardCharsets.UTF_8)));
-                                    } catch (JSONException e) {
-                                        callbackContext.error(e.getMessage());
-                                    }
-                                }
-                            });
+                            if (!task.isSuccessful()) {
+                                Exception e = task.getException();
+                                Log.e(TAG, "Error while loading Snapshot.", e);
+                                callbackContext.error(e != null && e.getMessage() != null
+                                        ? e.getMessage() : "Failed to load game save");
+                                return;
+                            }
+                            byte[] bytes = task.getResult();
+                            if (bytes == null) {
+                                // Error (if any) was already reported to JS
+                                return;
+                            }
+                            try {
+                                callbackContext.success(new JSONObject(new String(bytes, StandardCharsets.UTF_8)));
+                            } catch (JSONException e) {
+                                callbackContext.error(e.getMessage());
+                            }
                         }
                     });
             }
